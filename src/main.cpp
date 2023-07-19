@@ -62,196 +62,151 @@ void canint(const CAN_message_t& message) {
     parseMessage(message);
 }
 
-void parseMessage(CAN_message_t message) {
-    switch (message.id) {
-        case CH_ID: {
-            switch (message.buf[0]) {
-                case 0x01:  // set data response
-                {
-                    switch (message.buf[1]) {
-                        case 0x02:  // set voltage response
-                        {
-                            param.setVoltage = 0;
-                            uint32_t aux = message.buf[4];
-                            param.setVoltage |= aux << 24;
-                            aux = message.buf[5];
-                            param.setVoltage |= aux << 16;
-                            aux = message.buf[6];
-                            param.setVoltage |= aux << 8;
-                            aux = message.buf[7];
-                            param.setVoltage |= aux;
+void parseChargerMessage(uint8_t data[]) {
+    if (data[0] == 0x01)
+        switch (data[1]) {
+            case 0x02:  // set voltage response
+            {
+                param.setVoltage = 0;
+                param.setVoltage |= data[4] << 24;
+                param.setVoltage |= data[5] << 16;
+                param.setVoltage |= data[6] << 8;
+                param.setVoltage |= data[7];
 
-                            Serial.print("Voltage Set= ");
-                            Serial.print(param.setVoltage);
-
-                            break;
-                        }
-
-                        case 0x03:  // set current response
-                        {
-                            param.setCurrent = 0;
-                            uint32_t aux = message.buf[4];
-                            param.setCurrent |= aux << 24;
-                            aux = message.buf[5];
-                            param.setCurrent |= aux << 16;
-                            aux = message.buf[6];
-                            param.setCurrent |= aux << 8;
-                            aux = message.buf[7];
-                            param.setCurrent |= aux;
-
-                            Serial.print("Current Set= ");
-                            Serial.print(param.setCurrent);
-
-                            break;
-                        }
-
-                        default: {
-                            break;
-                        }
-                    }
-
-                    break;
-                }
-
-                case 0x03:  // read data response
-                {
-                    switch (message.buf[1]) {
-                        case 0x00:  // current voltage response
-                        {
-                            param.currVoltage = 0;
-                            uint32_t aux = message.buf[4];
-                            param.currVoltage |= aux << 24;
-                            aux = message.buf[5];
-                            param.currVoltage |= aux << 16;
-                            aux = message.buf[6];
-                            param.currVoltage |= aux << 8;
-                            aux = message.buf[7];
-                            param.currVoltage |= aux;
-
-                            Serial.print("Current voltage= ");
-                            Serial.print(param.currVoltage);
-
-                            break;
-                        }
-
-                        case 0x2f:  // current current response
-                        {
-                            param.currCurrent = 0;
-                            uint32_t aux = message.buf[4];
-                            param.currCurrent |= aux << 24;
-                            aux = message.buf[5];
-                            param.currCurrent |= aux << 16;
-                            aux = message.buf[6];
-                            param.currCurrent |= aux << 8;
-                            aux = message.buf[7];
-                            param.currCurrent |= aux;
-
-                            Serial.print("Current Current= ");
-                            Serial.print(param.currCurrent);
-
-                            break;
-                        }
-                    }
-
-                    break;
-                }
+                Serial.print("Voltage Set= ");
+                Serial.print(param.setVoltage);
 
                 break;
+            }
+
+            case 0x03:  // set current response
+            {
+                param.setCurrent = 0;
+                param.setCurrent |= data[4] << 24;
+                param.setCurrent |= data[5] << 16;
+                param.setCurrent |= data[6] << 8;
+                param.setCurrent |= data[7];
+
+                Serial.print("Current Set= ");
+                Serial.print(param.setCurrent);
+                break;
+            }
+
+            default:
+                break;
+        }
+
+    if (data[0] == 0x03)
+        switch (data[1]) {
+            case 0x00:  // current voltage response
+            {
+                param.currVoltage = 0;
+                param.currVoltage |= data[4] << 24;
+                param.currVoltage |= data[5] << 16;
+                param.currVoltage |= data[6] << 8;
+                param.currVoltage |= data[7];
+
+                Serial.print("Current voltage= ");
+                Serial.print(param.currVoltage);
+
+                break;
+            }
+
+            case 0x2f:  // current current response
+            {
+                param.currCurrent = 0;
+                param.currCurrent |= data[4] << 24;
+                param.currCurrent |= data[5] << 16;
+                param.currCurrent |= data[6] << 8;
+                param.currCurrent |= data[7];
+
+                Serial.print("Current Current= ");
+                Serial.print(param.currCurrent);
+                break;
+            }
+
+            default:
+                break;
+        }
+}
+
+void parseTAMessage(uint8_t data[]) {
+    switch (data[0]) {
+        case 0x00:
+            for (int i = 0; i < 7; i++)  // temp 0 - 6
+            {
+                param.temp[i + 0] = data[i + 1];
+            }
+
+            break;
+
+        case 0x1: {
+            for (int i = 0; i < 7; i++)  // temp 7 - 13
+            {
+                param.temp[i + 7] = data[i + 1];
             }
 
             break;
         }
 
-        case BMS_ID_CCL: {
-            param.ccl = message.buf[0] * 1000;
-            Serial.print("ccl = ");
-            Serial.println(param.ccl);
+        case 0x2: {
+            for (int i = 0; i < 7; i++)  // temp 14 - 20
+            {
+                param.temp[i + 14] = data[i + 1];
+            }
 
             break;
         }
 
-        case TA_ID: {
-            switch (message.buf[0]) {
-                case 0x00: {
-                    for (int i = 0; i < 7; i++)  // temp 0 - 6
-                    {
-                        param.temp[i + 0] = message.buf[i + 1];
-                    }
+        case 0x3: {
+            for (int i = 0; i < 7; i++)  // temp 21 - 27
+            {
+                param.temp[i + 21] = data[i + 1];
+            }
 
-                    break;
-                }
+            break;
+        }
 
-                case 0x1: {
-                    for (int i = 0; i < 7; i++)  // temp 7 - 13
-                    {
-                        param.temp[i + 7] = message.buf[i + 1];
-                    }
+        case 0x4: {
+            for (int i = 0; i < 7; i++)  // temp 28 - 34
+            {
+                param.temp[i + 28] = data[i + 1];
+            }
 
-                    break;
-                }
+            break;
+        }
 
-                case 0x2: {
-                    for (int i = 0; i < 7; i++)  // temp 14 - 20
-                    {
-                        param.temp[i + 14] = message.buf[i + 1];
-                    }
+        case 0x5: {
+            for (int i = 0; i < 7; i++)  // temp 35 - 41
+            {
+                param.temp[i + 35] = data[i + 1];
+            }
 
-                    break;
-                }
+            break;
+        }
 
-                case 0x3: {
-                    for (int i = 0; i < 7; i++)  // temp 21 - 27
-                    {
-                        param.temp[i + 21] = message.buf[i + 1];
-                    }
+        case 0x6: {
+            for (int i = 0; i < 7; i++)  // temp 42 - 48
+            {
+                param.temp[i + 42] = data[i + 1];
+            }
 
-                    break;
-                }
+            break;
+        }
 
-                case 0x4: {
-                    for (int i = 0; i < 7; i++)  // temp 28 - 34
-                    {
-                        param.temp[i + 28] = message.buf[i + 1];
-                    }
+        case 0x7: {
+            for (int i = 0; i < 7; i++)  // temp 49 - 55
+            {
+                param.temp[i + 49] = data[i + 1];
+            }
 
-                    break;
-                }
+            break;
+        }
 
-                case 0x5: {
-                    for (int i = 0; i < 7; i++)  // temp 35 - 41
-                    {
-                        param.temp[i + 35] = message.buf[i + 1];
-                    }
-
-                    break;
-                }
-
-                case 0x6: {
-                    for (int i = 0; i < 7; i++)  // temp 42 - 48
-                    {
-                        param.temp[i + 42] = message.buf[i + 1];
-                    }
-
-                    break;
-                }
-
-                case 0x7: {
-                    for (int i = 0; i < 7; i++)  // temp 49 - 55
-                    {
-                        param.temp[i + 49] = message.buf[i + 1];
-                    }
-
-                    break;
-                }
-
-                case 0x8: {
-                    for (int i = 0; i < 4; i++)  // temp 56 - 59
-                    {
-                        param.temp[i + 56] = message.buf[i + 1];
-                    }
-
-                    break;
-                }
+        case 0x8: {
+            for (int i = 0; i < 4; i++)  // temp 56 - 59
+            {
+                param.temp[i + 56] = data[i + 1];
             }
 
             break;
@@ -259,6 +214,25 @@ void parseMessage(CAN_message_t message) {
     }
 }
 
+void parseMessage(CAN_message_t message) {
+    switch (message.id) {
+        case CH_ID:
+            parseChargerMessage(message.buf);
+            break;
+
+        case BMS_ID_CCL: {
+            param.ccl = message.buf[0] * 1000;
+            Serial.print("ccl = ");
+            Serial.println(param.ccl);
+            break;
+        }
+
+        case TA_ID: {
+            parseTAMessage(message.buf);
+            break;
+        }
+    }
+}
 void chargerMachine() {
     switch (CH_Status) {
         case idle: {
