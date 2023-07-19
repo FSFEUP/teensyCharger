@@ -9,10 +9,9 @@ FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 elapsedMillis step;
 elapsedMillis temp;
 
-#define CH_SAFETY_PIN 33
-
-#define SHUTDOWN_PIN 34
-#define LATCHING_ERROR_PIN 35
+#define SHUTDOWN_PIN 28
+#define CH_SAFETY_PIN 27
+#define LATCHING_ERROR_PIN 38
 
 #define MAX_VOLTAGE 456000
 #define MAX_CURRENT 180000
@@ -40,7 +39,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println("startup");
 
-    pinMode(CH_SAFETY_PIN, OUTPUT);  //! n devia ser input? está a levar digital read mais tarde
+    pinMode(CH_SAFETY_PIN, INPUT);
     pinMode(SHUTDOWN_PIN, INPUT);
     pinMode(LATCHING_ERROR_PIN, INPUT);
 
@@ -279,7 +278,6 @@ void chargerMachine() {
             break;
         }
         case shutdown:
-            // delay(1000);
             break;
 
         default: {
