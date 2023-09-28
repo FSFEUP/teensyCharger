@@ -9,19 +9,19 @@ FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 elapsedMillis step;
 elapsedMillis temp;
 
-#define SHUTDOWN_PIN 28
-#define CH_SAFETY_PIN 27
-#define LATCHING_ERROR_PIN 38
+#define SHUTDOWN_PIN 32
+#define CH_SAFETY_PIN 36
+#define LATCHING_ERROR_PIN 34
 
 #define MAX_VOLTAGE 456000
-#define MAX_CURRENT 180000
+#define MAX_CURRENT 18000
 
 PARAMETERS param;
 
 bool request = 0;         // BMS request
 bool charge = 0;          // Charger status
 bool shutdownStatus = 0;  // Charging shutdown status
-bool latchingError = 0;   // Latching error status
+bool latchingStatus = 0;   // Latching error status
 
 enum status {  // state machine status
     idle,
@@ -33,34 +33,6 @@ status CH_Status;     // current state machine status
 status NX_CH_Status;  // next state machine status
 
 String CH_Status_Strings[] = {"idle", "charging", "shutdown"};  // print array
-
-void setup() {
-    // put your setup code here, to run once:
-    Serial.begin(115200);
-    Serial.println("startup");
-
-    pinMode(CH_SAFETY_PIN, INPUT);
-    pinMode(SHUTDOWN_PIN, INPUT);
-    pinMode(LATCHING_ERROR_PIN, INPUT);
-
-    can1.begin();
-    can1.setBaudRate(125000);
-    can1.enableFIFO();
-    can1.enableFIFOInterrupt();
-    can1.setFIFOFilter(REJECT_ALL);
-    can1.setFIFOFilter(0, CH_ID, STD);
-    can1.setFIFOFilter(1, BMS_ID_CCL, STD);
-    can1.setFIFOFilter(2, BMS_ID_ERR, STD);
-    can1.setFIFOFilter(3, TA_ID, STD);
-    can1.onReceive(canint);
-
-    param.setVoltage = MAX_VOLTAGE;
-    charge = 0;
-}
-
-void canint(const CAN_message_t& message) {
-    parseMessage(message);
-}
 
 void parseMessage(CAN_message_t message) {
     switch (message.id) {
@@ -164,8 +136,8 @@ void parseMessage(CAN_message_t message) {
 
         case BMS_ID_CCL: {
             param.ccl = message.buf[0] * 1000;
-            Serial.print("ccl = ");
-            Serial.println(param.ccl);
+            // Serial.print("ccl = ");
+            // Serial.println(param.ccl);
 
             break;
         }
@@ -259,12 +231,39 @@ void parseMessage(CAN_message_t message) {
     }
 }
 
+void canint(const CAN_message_t& message) {
+    parseMessage(message);
+}
+void setup() {
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+    Serial.println("startup");
+
+    pinMode(CH_SAFETY_PIN, INPUT);
+    pinMode(SHUTDOWN_PIN, INPUT);
+    pinMode(LATCHING_ERROR_PIN, INPUT);
+
+    can1.begin();
+    can1.setBaudRate(125000);
+    can1.enableFIFO();
+    can1.enableFIFOInterrupt();
+    can1.setFIFOFilter(REJECT_ALL);
+    can1.setFIFOFilter(0, CH_ID, STD);
+    can1.setFIFOFilter(1, BMS_ID_CCL, STD);
+    can1.setFIFOFilter(2, BMS_ID_ERR, STD);
+    can1.setFIFOFilter(3, TA_ID, STD);
+    can1.onReceive(canint);
+
+    param.setVoltage = MAX_VOLTAGE;
+    charge = 0;
+}
+
 void chargerMachine() {
     switch (CH_Status) {
         case idle: {
             if (shutdownStatus) {
                 NX_CH_Status = shutdown;
-            } else if (request == 1) {
+            } else if (request == 1 and latchingStatus == 1 ) {
                 NX_CH_Status = charging;
             }
             break;
@@ -272,7 +271,7 @@ void chargerMachine() {
         case charging: {
             if (shutdownStatus) {
                 NX_CH_Status = shutdown;
-            } else if (request == 0 or latchingError) {
+            } else if (request == 0 or latchingStatus == 0) {
                 NX_CH_Status = idle;
             }
             break;
@@ -295,7 +294,16 @@ void printStates() {
 void readInputs() {
     request = digitalRead(CH_SAFETY_PIN);
     shutdownStatus = digitalRead(SHUTDOWN_PIN);
-    latchingError = digitalRead(LATCHING_ERROR_PIN);
+    latchingStatus = digitalRead(LATCHING_ERROR_PIN);
+
+    // Serial.print("requet: ");
+    // Serial.println(request);
+    
+    // Serial.print("shutdown: ");
+    // Serial.println(shutdownStatus);
+
+    // Serial.print("latch: ");
+    // Serial.println(latchingStatus);
 }
 
 void powerOnModule(bool OnOff) {
@@ -402,10 +410,29 @@ void loop() {
         Serial.print("temp");
         Serial.print(i);
         Serial.print(": ");
-        Serial.println(param.temp[i]);
+        // Serial.println(param.temp[i]);
 
-        param.temp[i] = 0;
+        if(i == 20 or i == 21 or i== 29){
+            Serial.println(param.temp[19]);
+            continue;
+        }
+        if(param.temp[i] == 0)
+        {
+            Serial.println("Thermistor turned off");
+        }else
+        {
+            Serial.println(param.temp[i]);
+        }
+        // param.temp[i] = 0;
     }
 
+    // Serial.printf("maxallowed: %d\n", param.allowedCurrent);
+
+
     updateCharger(CH_Status);
+
+    // Serial.println(CH_Status_Strings[NX_CH_Status]);
+    // Serial.printf("ccl: %d\n", param.ccl);
+
+    // Serial.println("loop");
 }
